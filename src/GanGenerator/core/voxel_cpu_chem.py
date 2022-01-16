@@ -13,7 +13,7 @@ import rich
 from rich.console import Console
 from rich.progress import track
 import torch
-
+import time
 # if gpu is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 console = Console()
@@ -202,7 +202,7 @@ def coordinates_2grid(coord_list, V_SIZE, PAD=5.):
     liny = np.arange(ymin, ymax, V_SIZE)
     linz = np.arange(zmin, zmax, V_SIZE)
 
-    gridx, gridy, gridz = np.meshgrid(linx, liny, linz)
+    gridx, gridy, gridz = np.meshgrid(linx, liny, linz, sparse=True)
     return gridx, gridy, gridz, linx, liny, linz
 
 
@@ -211,7 +211,7 @@ def runner(all_files, curr_path):
     proc_file = 0
     for item in all_files:
         file, extension = os.path.splitext(item)
-        if extension == ".pdb" and file == "chainA":
+        if extension == ".pdb" and file == "2ogm":
             proc_file += 1
 
             print("Processing File", proc_file, file)
@@ -232,8 +232,9 @@ def runner(all_files, curr_path):
                 [N_ATOMTYPES, np.shape(linx)[0], np.shape(liny)[
                     0], np.shape(linz)[0]]
             )
-
+            atom_count = 0
             for atom in track(molecule.GetAtoms(), description="Progress:"):
+                atom_count += 1
                 id_mat = atom_id(atom)
                 # print(f"id_mat: {id_mat}\n atom: {atom}")
                 # print(f"Atom radius: {atom_radii(atom)}")
@@ -243,7 +244,6 @@ def runner(all_files, curr_path):
                         # Get Van der Waals radii (angstrom)
                         # TODO: check for bond and get radius
                         ATOM_RADIUS = atom_radii(atom)
-
                         for x in np.where(abs(linx - atomcoord[0]) < ATOM_RADIUS)[0]:
                             for y in np.where(abs(liny - atomcoord[1]) < ATOM_RADIUS)[0]:
                                 for z in np.where(abs(linz - atomcoord[2]) < ATOM_RADIUS)[0]:
@@ -256,7 +256,7 @@ def runner(all_files, curr_path):
                                               z] += atom_density(
                                         distance, SIGMA)
 
-    return occupancy, proc_file
+    return occupancy, proc_file, atom_count
 
 
 def grid_2coordinates(grid):
@@ -274,7 +274,7 @@ def grid_2coordinates(grid):
     return np.array(coordinates)
 
 
-def show_animation_plot(occupancy, filename):
+def show_animation_plot(occupancy, ATOM_TYPES):
     fig = px.imshow(occupancy, facet_col=0, animation_frame=1, facet_col_wrap=2,
                     binary_string=False, binary_format='jpg', height=800,
                     title="Slice Channel")
@@ -286,7 +286,7 @@ def show_animation_plot(occupancy, filename):
 def show_plot(occupancy):
     fig = plt.figure(figsize=(30., 50.))
     imagegrid = ImageGrid(fig, 111,
-                          nrows_ncols=(5, 3),
+                          nrows_ncols=(5, 5),
                           axes_pad=0.1,
                           )
 
@@ -303,19 +303,21 @@ def main():
     pdb_path = os.path.join(curr_path, "chainA-clean.pdb")
     pickle_path = os.path.join(curr_path, "3pickle_perpdb")
     all_files = os.listdir(curr_path)
-
-    occupancy, proc_file = runner(all_files, curr_path)
+    start = time.time()
+    occupancy, proc_file, atom_count = runner(all_files, curr_path)
     print("Unprocessed files: ", (len(all_files) - proc_file))
     # print(occupancy)
     print(occupancy.shape)
 
     # ploting_plot
-
-    show_animation_plot(occupancy, ATOM_TYPES)
+    end = time.time()
+    console.print(
+        f"[bold yellow]Total time of calculation [/bold yellow] [bold red]{atom_count}[bold red][bold yellow] atoms on a 4D grid[/bold yellow]: {end - start} [bold green]seconds[/bold green]")
+    #show_animation_plot(occupancy, ATOM_TYPES)
     show_plot(occupancy)
 
-    with open(os.path.join(curr_path, "occupancy.pkl"), 'wb') as f:
-        pickle.dump(occupancy, f)
+    # with open(os.path.join(curr_path, "occupancy.pkl"), 'wb') as f:
+    #    pickle.dump(occupancy, f)
 
 
 def remain():
@@ -332,5 +334,5 @@ def remain():
 
 
 if __name__ == "__main__":
-    # main()
-    remain()
+    main()
+    # remain()
