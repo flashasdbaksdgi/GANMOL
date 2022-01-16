@@ -1,7 +1,6 @@
 # Takes PDB file and outputs full maps for different atomtypes
 # Uses GPU for voxelation
 import matplotlib.pyplot as plt
-import plotly
 import plotly.express as px
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -10,8 +9,11 @@ import pickle
 from mpl_toolkits.axes_grid1 import ImageGrid
 import numpy as np  # CPU
 import rich
+import seaborn as sns
 from rich.console import Console
 from rich.progress import track
+from IPython import display
+
 import torch
 import time
 # if gpu is to be used
@@ -74,6 +76,11 @@ def atom_density(distance: float, SIGMA: float) -> float:
     # gaussian kernel
     density = np.exp(-(distance ** 2) / (2 * SIGMA ** 2))
     return density
+
+
+def inverse_density(density: float, sigma: float) -> float:
+    distnace = -((2 * sigma**2)*np.log(density))**1/2
+    return distnace
 
 
 def atom_density1(r, sigma):
@@ -207,8 +214,11 @@ def coordinates_2grid(coord_list, V_SIZE, PAD=5.):
 
 
 # Load in PDB files:-----------------------------------------------------------
+
+
 def runner(all_files, curr_path):
     proc_file = 0
+
     for item in all_files:
         file, extension = os.path.splitext(item)
         if extension == ".pdb" and file == "2ogm":
@@ -252,9 +262,13 @@ def runner(all_files, curr_path):
                                     # print(pointcoord)
                                     distance = np.linalg.norm(
                                         pointcoord - atomcoord)
-                                    occupancy[i, x, y,
-                                              z] += atom_density(
+                                    original_point = atom_density(
                                         distance, SIGMA)
+                                    occupancy[i, x, y,
+                                              z] += original_point
+                                    grid_losses_point = inverse_density(
+                                        original_point, SIGMA)
+                                    print(distance, grid_losses_point)
 
     return occupancy, proc_file, atom_count
 
@@ -264,13 +278,15 @@ def grid_2coordinates(grid):
     print(np.shape(grid))
     # grid = np.linalg.norm(grid)
     print("grid coordinates")
-    print(grid)
-    for i in range(0, np.shape(grid)[0]):
-        for j in range(0, np.shape(grid)[1]):
-            for k in range(0, np.shape(grid)[2]):
-                coordinates.append(
-                    np.array(grid[i, j, k] * np.linalg.norm(grid[i, j, k]))
-                )
+    for i in range(grid.shape[0]):
+        for x in range(0, np.shape(grid)[1]):
+            for y in range(0, np.shape(grid)[2]):
+                for z in range(0, np.shape(grid)[3]):
+
+                    coordinates.append(
+                        np.array(grid[i, x, y, z] *
+                                 np.linalg.norm(grid[i, x, y, z]))
+                    )
     return np.array(coordinates)
 
 
@@ -313,7 +329,7 @@ def main():
     end = time.time()
     console.print(
         f"[bold yellow]Total time of calculation [/bold yellow] [bold red]{atom_count}[bold red][bold yellow] atoms on a 4D grid[/bold yellow]: {end - start} [bold green]seconds[/bold green]")
-    #show_animation_plot(occupancy, ATOM_TYPES)
+    # show_animation_plot(occupancy, ATOM_TYPES)
     show_plot(occupancy)
 
     # with open(os.path.join(curr_path, "occupancy.pkl"), 'wb') as f:
@@ -329,8 +345,12 @@ def remain():
         occupancy = pickle.load(f)
 
     print(occupancy.shape)
-    show_plot(occupancy)
-    print(ATOM_TYPES)
+    # show_plot(occupancy)
+    coordinates = grid_2coordinates(occupancy)
+    print(coordinates.shape)
+    print(coordinates[:, :, :, 0])
+
+    # print(ATOM_TYPES)
 
 
 if __name__ == "__main__":
