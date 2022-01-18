@@ -8,6 +8,8 @@ import numpy as np
 plt.ioff()
 
 # define an arrow class:
+
+
 class Arrow3D(FancyArrowPatch):
     def __init__(self, start=[0, 0, 0], end=[1, 1, 1], *args, **kwargs):
         if "arrowstyle" not in kwargs:
@@ -72,7 +74,7 @@ def WireframeSphere(
     if n_circles_latitude is None:
         n_circles_latitude = max(n_meridians / 2, 4)
     u, v = np.mgrid[
-        0 : 2 * np.pi : n_meridians * 1j, 0 : np.pi : n_circles_latitude * 1j
+        0: 2 * np.pi: n_meridians * 1j, 0: np.pi: n_circles_latitude * 1j
     ]
     sphere_x = centre[0] + radius * np.cos(u) * np.sin(v)
     sphere_y = centre[1] + radius * np.sin(u) * np.sin(v)
@@ -148,11 +150,12 @@ def function(
         A list of points (see central_point to know what a point is)
     """
     # find most distant points
-    max_distance, most_distant_points = find_most_distants(other_points, central_point)
+    max_distance, most_distant_points = find_most_distants(
+        other_points, central_point)
     # prepare figure and 3d axis
     fig = plt.figure()
     ax = fig.gca(projection="3d")
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
     # draw sphere
     ax.plot_wireframe(
         *WireframeSphere(central_point, max_distance), color="r", alpha=0.5
@@ -162,7 +165,8 @@ def function(
     # draw arrows to most distant points:
     for extreme_point in most_distant_points:
         ax.add_artist(Arrow3D(start=central_point, end=extreme_point))
-    fig.show()
+    # fig.show()
+    plt.show()
 
 
 if __name__ == "__main__":

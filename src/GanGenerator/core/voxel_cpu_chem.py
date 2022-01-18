@@ -1,11 +1,13 @@
 # Takes PDB file and outputs full maps for different atomtypes
 # Uses GPU for voxelation
+import os
+import pickle
+import plotly
 import matplotlib.pyplot as plt
 import plotly.express as px
 from rdkit import Chem
 from rdkit.Chem import AllChem
-import os
-import pickle
+
 from mpl_toolkits.axes_grid1 import ImageGrid
 import numpy as np  # CPU
 import rich
@@ -22,19 +24,8 @@ console = Console()
 
 # import cupy as cp #FOR CUDA
 
-
 # Settings:-------------------------------------------------------------------
 #
-# Defaults:
-CUTOFF = 1.5  # CUTOFF (beyond which a point cannot feel an atom) (angstroms)
-# the variance (typically 2.0 for a normal Gaussian distribution)
-SIGMA = 1
-V_SIZE = 0.5  # voxel size
-PAD = 5  # PAD size around edges of protein in angstroms
-N_ATOMTYPES = 5  # Number of types of atoms, must be aligned with atom_types.py
-proc_file = 0  # number of files processed
-DIM_SIZE = 23  # number of voxels in each dimension
-
 
 ATOM_TYPES = {
     0: "Carbon",
@@ -42,12 +33,34 @@ ATOM_TYPES = {
     2: "Oxygen",
     3: "Sulphur",
     4: "Hydrogen",
-    5: "Other",
+    5: 'Phosphorus',
+    6: 'Fluorine',
+    7: 'Chlorine',
+    8: 'Bromine',
+    9: 'Iodine',
+    10: 'Magnesium',
+    11: 'Manganese',
+    12: 'Zinc',
+    13: 'Calcium',
+    14: 'Iron',
+    15: 'Boron',
 
 }
 
+# Defaults:
+CUTOFF = 1.5  # CUTOFF (beyond which a point cannot feel an atom) (angstroms)
+# the variance (typically 2.0 for a normal Gaussian distribution)
+SIGMA = 1
+V_SIZE = 0.5  # voxel size
+PAD = 5  # PAD size around edges of protein in angstroms
+# Number of types of atoms, must be aligned with atom_types.py
+N_ATOMTYPES = len(ATOM_TYPES)
+proc_file = 0  # number of files processed
+DIM_SIZE = 60  # number of voxels in each dimension
+
 
 def atom_id(atom: Chem.Atom) -> np.ndarray:
+
     id_mat = np.zeros([1, N_ATOMTYPES])[0]
     # Atom type 1: Carbon
     if atom.GetSymbol() == "C":
@@ -66,21 +79,51 @@ def atom_id(atom: Chem.Atom) -> np.ndarray:
         id_mat[3] = 1
 
     if atom.GetSymbol() == "H":
-        id_mat[3] = 1
+        id_mat[4] = 1
+
+    if atom.GetSymbol() == "P":
+        id_mat[5] = 1
+
+    if atom.GetSymbol() == "F":
+        id_mat[6] = 1
+
+    if atom.GetSymbol() == "Cl":
+        id_mat[7] = 1
+
+    if atom.GetSymbol() == "Br":
+        id_mat[8] = 1
+
+    if atom.GetSymbol() == "I":
+        id_mat[9] = 1
+
+    if atom.GetSymbol() == "Mg":
+        id_mat[10] = 1
+
+    if atom.GetSymbol() == "Mn":
+        id_mat[11] = 1
+
+    if atom.GetSymbol() == "Zn":
+        id_mat[12] = 1
+
+    if atom.GetSymbol() == "Ca":
+        id_mat[13] = 1
+
+    if atom.GetSymbol() == "Fe":
+        id_mat[14] = 1
+
+    if atom.GetSymbol() == "B":
+        id_mat[15] = 1
 
     return id_mat
 
 
 # Calculate density felt at a point from a distance from an atom center:
 def atom_density(distance: float, SIGMA: float) -> float:
-    # gaussian kernel
-    density = np.exp(-(distance ** 2) / (2 * SIGMA ** 2))
-    return density
+    return np.exp(-(distance ** 2) / (2 * SIGMA ** 2))
 
 
 def inverse_density(density: float, sigma: float) -> float:
-    distnace = -((2 * sigma**2)*np.log(density))**1/2
-    return distnace
+    return -((2 * sigma**2)*np.log(density))**1/2
 
 
 def atom_density1(r, sigma):
@@ -88,9 +131,9 @@ def atom_density1(r, sigma):
 
 
 def sigmoid_smoothing(array: np.ndarray) -> np.ndarray:
-    for i in range(0, np.shape(array)[0]):
-        for j in range(0, np.shape(array)[1]):
-            for k in range(0, np.shape(array)[2]):
+    for i in range(np.shape(array)[0]):
+        for j in range(np.shape(array)[1]):
+            for k in range(np.shape(array)[2]):
                 array[i, j, k] = 1 / (1 + np.exp(-array[i, j, k]))
     return array
 
@@ -111,25 +154,23 @@ def compute_centroid(coordinates) -> np.ndarray:
     coordinates: np.ndarray
       Shape (N, 3), where N is number atoms.
     """
-    centroid = np.mean(coordinates, axis=0, dtype=np.float32)
-    return centroid
+    return np.mean(coordinates, axis=0, dtype=np.float32)
 
 
 def atom_radii(atom: Chem.rdchem.Atom) -> float:
     """van der Waals radii:
     """
-    atom_radius = Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum())
-    return atom_radius
+    return Chem.GetPeriodicTable().GetRvdw(atom.GetAtomicNum())
 
 
 # Calculate center of geometry for a given residue:
 def res_cog(residue):
     coord = [
         residue.get_list()[i].get_coord()
-        for i in range(0, np.shape(residue.get_list())[0])
+        for i in range(np.shape(residue.get_list())[0])
     ]
-    cog = np.mean(coord, axis=0)
-    return cog
+
+    return np.mean(coord, axis=0)
 
 
 def atom_coordinate(atom, mol) -> list:
@@ -138,7 +179,7 @@ def atom_coordinate(atom, mol) -> list:
 
 
 def grid_construct(xyz, voxel_size, grid_center=None,
-                   dimension=60, pad=2.0, pad_on=False):
+                   dimension=23.5, pad=2.0, pad_on=False):
 
     if grid_center is None:
         grid_center = compute_centroid(xyz)
@@ -180,7 +221,7 @@ def grid_construct(xyz, voxel_size, grid_center=None,
 
 def molecule_2coordinates(mol):
     coordinates = []
-    for atom in range(0, mol.GetNumAtoms()):
+    for atom in range(mol.GetNumAtoms()):
         atom_coords = mol.GetConformer().GetAtomPosition(atom)
         coordinates.append(
             np.array([atom_coords.x, atom_coords.y,
@@ -190,19 +231,19 @@ def molecule_2coordinates(mol):
 
 
 def coordinates_2grid(coord_list, V_SIZE, PAD=5.):
-    xmin = min([coord_list[i][0] for i in range(0, _shape)])
+    xmin = min(coord_list[i][0] for i in range(0, _shape))
     xmin = xmin - PAD
-    xmax = max([coord_list[i][0] for i in range(0, _shape)])
+    xmax = max(coord_list[i][0] for i in range(_shape))
     xmax = xmax + PAD
 
-    ymin = min([coord_list[i][1] for i in range(0, _shape)])
+    ymin = min([coord_list[i][1] for i in range(_shape)])
     ymin = ymin - PAD
-    ymax = max([coord_list[i][1] for i in range(0, _shape)])
+    ymax = max(coord_list[i][1] for i in range(_shape))
     ymax = ymax + PAD
 
-    zmin = min([coord_list[i][2] for i in range(0, _shape)])
+    zmin = min(coord_list[i][2] for i in range(0, _shape))
     zmin = zmin - PAD
-    zmax = max([coord_list[i][2] for i in range(0, _shape)])
+    zmax = max(coord_list[i][2] for i in range(_shape))
     zmax = zmax + PAD
 
     linx = np.arange(xmin, xmax, V_SIZE)
@@ -216,17 +257,13 @@ def coordinates_2grid(coord_list, V_SIZE, PAD=5.):
 # Load in PDB files:-----------------------------------------------------------
 
 
-def runner(all_files, curr_path):
-    proc_file = 0
+def runner(all_files, curr_path, DIM):
 
-    for item in all_files:
+    for proc_file, item in enumerate(all_files):
         file, extension = os.path.splitext(item)
         if extension == ".pdb" and file == "2ogm":
-            proc_file += 1
 
-            print("Processing File", proc_file, file)
-
-            structure_id = file
+            #print("Processing File", proc_file, file)
             filename = os.path.join(curr_path, item)
             molecule = Chem.MolFromPDBFile(filename, removeHs=False)
 
@@ -235,7 +272,7 @@ def runner(all_files, curr_path):
             coord_list = molecule_2coordinates(molecule)
             _shape = np.shape(coord_list)[0]
             gridx, gridy, gridz, linx, liny, linz = grid_construct(
-                coord_list, V_SIZE, pad=PAD)
+                coord_list, V_SIZE, pad=PAD, dimension=DIM)
             gridshape = np.shape(gridx)
 
             occupancy = np.zeros(
@@ -243,12 +280,13 @@ def runner(all_files, curr_path):
                     0], np.shape(linz)[0]]
             )
             atom_count = 0
+
             for atom in track(molecule.GetAtoms(), description="Progress:"):
                 atom_count += 1
                 id_mat = atom_id(atom)
                 # print(f"id_mat: {id_mat}\n atom: {atom}")
                 # print(f"Atom radius: {atom_radii(atom)}")
-                for i in range(0, N_ATOMTYPES):
+                for i in range(N_ATOMTYPES):
                     if id_mat[i] == 1:
                         atomcoord = atom_coordinate(atom, molecule)
                         # Get Van der Waals radii (angstrom)
@@ -264,11 +302,11 @@ def runner(all_files, curr_path):
                                         pointcoord - atomcoord)
                                     original_point = atom_density(
                                         distance, SIGMA)
-                                    occupancy[i, x, y,
-                                              z] += original_point
-                                    grid_losses_point = inverse_density(
-                                        original_point, SIGMA)
-                                    print(distance, grid_losses_point)
+                                    occupancy[i, z, x, y
+                                              ] += original_point
+                                    # grid_losses_point = inverse_density(
+                                    #    original_point, SIGMA)
+                                    #print(distance, grid_losses_point)
 
     return occupancy, proc_file, atom_count
 
@@ -279,9 +317,9 @@ def grid_2coordinates(grid):
     # grid = np.linalg.norm(grid)
     print("grid coordinates")
     for i in range(grid.shape[0]):
-        for x in range(0, np.shape(grid)[1]):
-            for y in range(0, np.shape(grid)[2]):
-                for z in range(0, np.shape(grid)[3]):
+        for x in range(np.shape(grid)[1]):
+            for y in range(np.shape(grid)[2]):
+                for z in range(np.shape(grid)[3]):
 
                     coordinates.append(
                         np.array(grid[i, x, y, z] *
@@ -291,7 +329,7 @@ def grid_2coordinates(grid):
 
 
 def show_animation_plot(occupancy, ATOM_TYPES):
-    fig = px.imshow(occupancy, facet_col=0, animation_frame=1, facet_col_wrap=2,
+    fig = px.imshow(occupancy, facet_col=0, animation_frame=1, facet_col_wrap=8,
                     binary_string=False, binary_format='jpg', height=800,
                     title="Slice Channel")
     for i in range(occupancy.shape[0]):
@@ -320,7 +358,7 @@ def main():
     pickle_path = os.path.join(curr_path, "3pickle_perpdb")
     all_files = os.listdir(curr_path)
     start = time.time()
-    occupancy, proc_file, atom_count = runner(all_files, curr_path)
+    occupancy, proc_file, atom_count = runner(all_files, curr_path, DIM_SIZE)
     print("Unprocessed files: ", (len(all_files) - proc_file))
     # print(occupancy)
     print(occupancy.shape)
@@ -329,7 +367,7 @@ def main():
     end = time.time()
     console.print(
         f"[bold yellow]Total time of calculation [/bold yellow] [bold red]{atom_count}[bold red][bold yellow] atoms on a 4D grid[/bold yellow]: {end - start} [bold green]seconds[/bold green]")
-    # show_animation_plot(occupancy, ATOM_TYPES)
+    #show_animation_plot(occupancy, ATOM_TYPES)
     show_plot(occupancy)
 
     # with open(os.path.join(curr_path, "occupancy.pkl"), 'wb') as f:
