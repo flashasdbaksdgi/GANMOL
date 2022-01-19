@@ -4,20 +4,15 @@ import os
 import pickle
 import plotly
 import torch
+import time
 import matplotlib.pyplot as plt
 import plotly.express as px
 from rdkit import Chem
-from rdkit.Chem import AllChem
-
 from mpl_toolkits.axes_grid1 import ImageGrid
-# import numpy as np  # CPU
-import rich
 from rich.console import Console
 from rich.progress import track
 
 
-import time
-# if gpu is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 console = Console()
 
@@ -287,7 +282,7 @@ def grid_2coordinates(grid):
                         torch.tensor(grid[i, x, y, z] *
                                      torch.linalg.norm(grid[i, x, y, z]))
                     )
-    return torch.array(coordinates)
+    return torch.tensor(coordinates)
 
 
 def show_animation_plot(occupancy, ATOM_TYPES):
@@ -311,13 +306,23 @@ def show_plot(occupancy):
     plt.show()
 
 
+def forward_plot(occupancy):
+
+    return None
+
+
+def loss_function(occupancy):
+
+    return None
+
+
 def main():
 
     # Identify file locations:
     curr_path = "./notebooks/grid"  # os.getcwd()
 
-    pdb_path = os.path.join(curr_path, "chainA-clean.pdb")
-    pickle_path = os.path.join(curr_path, "3pickle_perpdb")
+    #pdb_path = os.path.join(curr_path, "chainA-clean.pdb")
+    #pickle_path = os.path.join(curr_path, "3pickle_perpdb")
     all_files = os.listdir(curr_path)
     start = time.time()
     occupancy, proc_file, atom_count = runner(

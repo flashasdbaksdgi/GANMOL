@@ -349,6 +349,19 @@ def show_plot(occupancy):
     plt.show()
 
 
+def tensor_2pdb(tensor, filename="tensor", format='pdb'):
+
+    coordinates = getCoordinates(tensor)
+
+    if format == 'pdb':
+        Chem.MolToPDBFil(mol, filename)
+    elif format == 'xyz':
+        Chem.MolToXYZFile(mol, filename)
+    else:
+        Chem.MolToMolFile(mol, filename)
+    return None
+
+
 def main():
 
     # Identify file locations:
