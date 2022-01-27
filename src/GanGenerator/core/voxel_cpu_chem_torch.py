@@ -42,14 +42,14 @@ ATOM_TYPES = {
 }
 
 # Defaults:
-CUTOFF = 1.5  # CUTOFF (beyond which a point cannot feel an atom) (angstroms)
+# CUTOFF = 1.5  # CUTOFF (beyond which a point cannot feel an atom) (angstroms)
 # the variance (typically 2.0 for a normal Gaussian distribution)
 SIGMA = 1
 V_SIZE = 0.5  # voxel size
 PAD = 5  # PAD size around edges of protein in angstroms
 # Number of types of atoms, must be aligned with atom_types.py
 N_ATOMTYPES = len(ATOM_TYPES)
-DIM_SIZE = 100  # number of voxels in each dimension
+DIM_SIZE = 200  # number of voxels in each dimension
 
 
 def atom_id(atom: Chem.Atom) -> torch.tensor:

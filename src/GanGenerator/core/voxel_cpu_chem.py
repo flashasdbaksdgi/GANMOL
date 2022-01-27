@@ -373,7 +373,7 @@ def main():
     start = time.time()
     occupancy, proc_file, atom_count = runner(all_files, curr_path, DIM_SIZE)
     print("Unprocessed files: ", (len(all_files) - proc_file))
-    # print(occupancy)
+    print(occupancy)
     print(occupancy.shape)
 
     # ploting_plot

@@ -19,10 +19,11 @@
 
 # pdb_line = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}  {:>2s}{:2s}".format(
 # ...)
-import numpy as np
+#import numpy as np
+import torch
 from rdkit import Chem
 from rdkit.Chem import AllChem
-import torch
+
 ATOM_TYPES = {
     0: "C",
     1: "H",
@@ -66,23 +67,23 @@ def pdb_writer(mol: torch.tensor, atom_type: dict, **kwargs) -> None:
     SAMPLE = kwargs.get("SAMPLE", "")
     mol_type = kwargs.get("atom_type", "ligand")
     atom_serial_number = kwargs.get("atom_serial_number", 0)
-    atom_name = kwargs.get("atom_name", "")
+    atom_name = kwargs.get("atom_name", "    ")
     alternate_location_indicator = kwargs.get(
         "alternate_location_indicator", "")
-    residue_name = kwargs.get("residue_name", "")
+    residue_name = kwargs.get("residue_name", "   ")
     chain_identifier = kwargs.get("chain_identifier", "")
     residue_sequence_number = kwargs.get("residue_sequence_number", "")
     insertion_of_residues = kwargs.get(
         "insertion_of_residues", "")
-    occupancy = kwargs.get("occupancy", 1.00)
-    temperature_factor = kwargs.get("temperature_factor", 0.00)
-    element_symbol = kwargs.get("element_symbol", "")
-    charge_on_the_atom = kwargs.get("charge_on_the_atom", "")
+    occupancy = kwargs.get("occupancy", 1.0000)
+    temperature_factor = kwargs.get("temperature_factor", 0.0000)
+    element_symbol = kwargs.get("element_symbol", "  ")
+    charge_on_the_atom = kwargs.get("charge_on_the_atom", "  ")
 
     if mol_type == "ligand":
         molecule = "HETATM"
-        residue_name = "UNK"
-        chain_identifier = ""
+        residue_name = "UNK "
+        chain_identifier = " "
         residue_sequence_number = 0
 
 # pdb_line = f"{molecule:6s}{atom_serial_number:5d} {atom_name:^4s}{alternate_location_indicator:1s}{residue_name:3s} {chain_identifier:1s}{residue_sequence_number:4d}{insertion_of_residues:1s}{coordinates_X:8.3f}{coordinates_Y:8.3f}{coordinates_Z:8.3f}{occupancy:6.2f}{temperature_factor:6.2f}  {element_symbol:>2s}{charge_on_the_atom:2s}"
@@ -98,13 +99,16 @@ def pdb_writer(mol: torch.tensor, atom_type: dict, **kwargs) -> None:
             coordinates_Y = mol[i][j][1]
             coordinates_Z = mol[i][j][2]
             element_symbol = atom_type[i]
-            pdb_line = f"{molecule:6s}{atom_serial_number:5d} {atom_name:^4s}{alternate_location_indicator:1s}{residue_name:3s} {chain_identifier:1s}{residue_sequence_number:4d}{insertion_of_residues:1s}{coordinates_X:8.3f}{coordinates_Y:8.3f}{coordinates_Z:8.3f}{occupancy:6.2f}{temperature_factor:6.2f}  {element_symbol:>2s}{charge_on_the_atom:2s}"
-            # print(pdb_line)
+            #pdb_line = f"{molecule:6s}{atom_serial_number:5d} {atom_name:^4s}{alternate_location_indicator:1s}{residue_name:3s} {chain_identifier:1s}{residue_sequence_number:4d}{insertion_of_residues:1s}{coordinates_X:8.3f}{coordinates_Y:8.3f}{coordinates_Z:8.3f}{occupancy:6.2f}{temperature_factor:6.2f}  {element_symbol:>2s}{charge_on_the_atom:2s}"
+            pdb_line = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}".format(
+                molecule, atom_serial_number, atom_name, alternate_location_indicator, residue_name, chain_identifier, residue_sequence_number, insertion_of_residues, coordinates_X, coordinates_Y, coordinates_Z, occupancy, temperature_factor, element_symbol, charge_on_the_atom)
+            print(pdb_line)
             mol_list.append(pdb_line)
     # mol_list.insert(0, "") # insert header here
     with open("1Tensor_test.pdb", "w+") as fw:
         for i in mol_list:
             try:
+                # print(i)
                 if float(i[30:38]) == 0.000 and float(i[39:46]) == 0.000:
                     pass
                 else:
@@ -116,8 +120,8 @@ def pdb_writer(mol: torch.tensor, atom_type: dict, **kwargs) -> None:
         "1Tensor_test.pdb", removeHs=False)
     # print(Chem.MolToPDBBlock(chem_mol))
     print("==========================")
-    chem_mol = Chem.AddHs(chem_mol)
-    AllChem.MMFFOptimizeMolecule(chem_mol)
+    #chem_mol = Chem.AddHs(chem_mol)
+    # AllChem.MMFFOptimizeMolecule(chem_mol)
     Chem.MolToPDBFile(chem_mol, "3Tensor_test.pdb")
 
 
